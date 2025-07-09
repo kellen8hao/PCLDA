@@ -1,0 +1,105 @@
+# module load StdEnv/2023 r/4.4.0
+#R 
+```{R install packages}
+if (!requireNamespace("GSEABase", quietly = TRUE)) {
+  BiocManager::install("GSEABase")
+}
+library(GSEABase)
+# Read the GMT file
+kegg_pathway_list <- getGmt("c2.cp.kegg_legacy.v2025.1.Hs.symbols.gmt")
+# note: this file is downloaded from https://www.gsea-msigdb.org/gsea/msigdb/human/collections.jsp
+# subset of the C2(curated gene sets) set: KEGG_LEGACY subset of CP
+# the KEGG_LEGACY contains 186 gene sets
+```
+
+```{R convert to a list}
+# Convert to a named list: pathway name -> gene vector
+kegg_list <- lapply(kegg_pathway_list, geneIds)
+names(kegg_list) <- sapply(kegg_pathway_list, function(x) x@setName)
+
+```
+
+```{R load PCLDA train gene list}
+scRNAdata <- readRDS("/Users/a1234/Downloads/ttest_res/noscreening/1/test.rds")
+# Convert colnames to gene symbols for matching
+genes_in_data <- colnames(scRNAdata)
+
+# Function to compute mean expression for overlapping genes
+pathway_avg_expr <- lapply(names(kegg_list), function(pw) {
+  overlapping_genes <- intersect(kegg_list[[pw]], genes_in_data)
+  if (length(overlapping_genes) == 0) {
+    return(rep(NA, nrow(scRNAdata)))
+  }
+  rowMeans(scRNAdata[, overlapping_genes, drop = FALSE])
+})
+# Name the list
+names(pathway_avg_expr) <- names(kegg_list)
+
+```
+
+```{R convert to data frame or matrix}
+# Convert list to data frame
+pathway_expr_df <- as.data.frame(do.call(cbind, pathway_avg_expr))
+rownames(pathway_expr_df) <- rownames(scRNAdata)
+saveRDS(pathway_expr_df, file = "pathway_expr_df_test.rds")
+
+```
+```{R remove pathway with no overlapped genes}
+# Compute column SDs
+col_sd <- apply(pathway_expr_df, 2, function(x) sd(x, na.rm = TRUE))
+# Get valid columns
+valid_cols <- which(col_sd > 0 & !is.na(col_sd))
+
+# Subset only if there are valid columns
+if (length(valid_cols) > 0) {
+  pathway_expr_df_filtered <- pathway_expr_df[, valid_cols, drop = FALSE]
+} else {
+  warning("No columns with non-zero variance found. PCA cannot be performed.")
+}
+
+saveRDS(pathway_expr_df_filtered, file = "pathway_expr_df_filtered_test.rds")
+
+```
+
+
+
+
+
+
+
+```{R visualizing the pathway level gene expression matrix}
+# PCA on pathway-level expression
+
+pr <- prcomp(pathway_expr_df_filtered, scale. = TRUE)
+
+
+plot(pr$x[, 1:2], col = "blue", pch = 20, main = "PCA of Pathway Activity")
+
+
+# Open PDF device
+pdf("PCA_pathway_expression.pdf", width = 6, height = 6)
+
+# Plot PCA
+plot(pr$x[, 1:2],
+     col = "blue", pch = 20,
+     xlab = "PC1", ylab = "PC2",
+     main = "PCA of Pathway Activity")
+
+# Close PDF device
+dev.off()
+
+# Heatmap
+pdf("Heatmap_pathway_expression.pdf", width = 16, height = 6)
+
+heatmap(as.matrix(pathway_expr_df_filtered[1:100, 1:20]), scale = "row")  # Adjust dimensions
+dev.off()
+
+```
+
+```{R run LDA}
+#based on the pathway_expr_df_filtered variable, which is size of 8562 * 179, link cell type as response variable, and set up LDA models.
+# run cross-validation to check the performance. The first step is to see whether it works, or whether the cell type could be predicted?
+
+
+
+```
