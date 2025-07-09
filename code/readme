@@ -1,1 +1,2 @@
 The full implementation of PCLDA, including all preprocessing scripts and benchmarking pipelines, is provided in the repository. 
+The input data should be formatted with genes as columns and cells as rows, with the first column representing the cell type label.
