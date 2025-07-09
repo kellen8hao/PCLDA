@@ -1,0 +1,2 @@
+The corresponding R Markdown file detailing the generation of the pathway-level gene expression matrix—obtained by averaging the expression levels of genes within
+each KEGG pathway—is available on GitHub. This file also includes descriptions of the KEGG pathway definitions and the procedures used for their calculation.
